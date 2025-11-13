@@ -45,6 +45,16 @@ const UsersPage = () => {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<any>(null);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string>('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordData, setPasswordData] = useState({
+    password: '',
+    confirmPassword: ''
+  });
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -169,6 +179,68 @@ const UsersPage = () => {
   const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setJsonData(e.target.value);
     setImportError(null);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    try {
+      if (passwordData.password !== passwordData.confirmPassword) {
+        throw new Error('Passwords do not match');
+      }
+
+      if (passwordData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+
+      const response = await fetch('/api/rcm/users', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: selectedUserId,
+          password: passwordData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update password');
+      }
+
+      setPasswordSuccess(data.message);
+      setPasswordData({ password: '', confirmPassword: '' });
+      setShowPasswordForm(false);
+      setSelectedUserId(null);
+      setSelectedUserEmail('');
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const openPasswordForm = (userId: string, email: string) => {
+    console.log('Opening password form for:', userId, email);
+    setSelectedUserId(userId);
+    setSelectedUserEmail(email);
+    setShowPasswordForm(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+    setPasswordData({ password: '', confirmPassword: '' });
   };
 
   const formatDate = (dateString: string | null) => {
@@ -427,6 +499,87 @@ const UsersPage = () => {
           </div>
         )}
 
+        {/* Password Change Form */}
+        {console.log('showPasswordForm:', showPasswordForm) || showPasswordForm && (
+          <div className="mb-8 bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">
+              Change Password for {selectedUserEmail}
+            </h2>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  value={passwordData.password}
+                  onChange={handlePasswordInputChange}
+                  required
+                  minLength={6}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Minimum 6 characters"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordInputChange}
+                  required
+                  minLength={6}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Re-enter new password"
+                />
+              </div>
+
+              {passwordError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-red-800">{passwordError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    setSelectedUserId(null);
+                    setSelectedUserEmail('');
+                    setPasswordData({ password: '', confirmPassword: '' });
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {passwordLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         <div className="bg-white shadow overflow-hidden sm:rounded-md">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -449,6 +602,9 @@ const UsersPage = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Provider
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -508,22 +664,34 @@ const UsersPage = () => {
                         'No phone'
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.identities && user.identities.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {user.identities.map((identity, index) => (
-                            <span 
-                              key={index}
-                              className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800"
-                            >
-                              {identity.provider}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        'Unknown'
-                      )}
-                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                       {user.identities && user.identities.length > 0 ? (
+                         <div className="flex flex-wrap gap-1">
+                           {user.identities.map((identity, index) => (
+                             <span 
+                               key={index}
+                               className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800"
+                             >
+                               {identity.provider}
+                             </span>
+                           ))}
+                         </div>
+                       ) : (
+                         'Unknown'
+                       )}
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            console.log('Button clicked for user:', user.id, user.email);
+                            openPasswordForm(user.id, user.email || '');
+                          }}
+                          className="text-blue-600 hover:text-blue-900 font-medium text-sm"
+                        >
+                          Change Password
+                        </button>
+                     </td>
                   </tr>
                 ))}
               </tbody>

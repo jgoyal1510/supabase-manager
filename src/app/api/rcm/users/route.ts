@@ -119,6 +119,57 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json();
+    const { userId, password } = body;
+
+    // Validate required fields
+    if (!userId || !password) {
+      return NextResponse.json(
+        { error: 'User ID and password are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password must be at least 6 characters long' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createSupabaseServerAdminClient();
+
+    // Update user password with admin client
+    const { data: user, error } = await supabase.auth.admin.updateUserById(
+      userId,
+      { password }
+    );
+
+    if (error) {
+      console.error('Error updating user password:', error);
+      return NextResponse.json(
+        { error: 'Failed to update password', details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
